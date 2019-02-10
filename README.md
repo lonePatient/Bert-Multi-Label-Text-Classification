@@ -47,10 +47,10 @@ you need download pretrained bert model (`bert-base-uncased`)
 
 1. Download the Bert pretrained model from [AWS S3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased.tar.gz) and place it into the `/pybert/model/pretrain` directory.
 2. `pip install pytorch-pretrained-bert` from [github](https://github.com/huggingface/pytorch-pretrained-BERT).
-3. run `python convert_tf_checkpoint_to_pytorch.py` to transfer the pretrained model(tensorflow version)  into pytorch form .
-4. prepare [kaggle data](https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/data), you can modify the `io.data_transformer.py` to adapt your data.
+3. Run `python convert_tf_checkpoint_to_pytorch.py` to transfer the pretrained model(tensorflow version)  into pytorch form .
+4. Prepare [kaggle data](https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/data), you can modify the `io.data_transformer.py` to adapt your data.
 5. Modify configuration information in `pybert/config/basic_config.py`(the path of data,...).
-6. run `python train_bert_multi_label.py`.
+6. Run `python train_bert_multi_label.py`.
 
 ## Fine-tuning result
 
