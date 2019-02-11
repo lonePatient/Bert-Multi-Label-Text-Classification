@@ -56,15 +56,15 @@ you need download pretrained bert model (`bert-base-uncased`)
 
 ### training 
 
-comming soon
+coming soon
 
 ### training figure
 
-comming soon
+coming soon
 
 ### result
 
-comming soon
+coming soon
 
 ## Tips
 
