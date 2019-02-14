@@ -6,6 +6,7 @@ import torch
 from ..callback.progressbar import ProgressBar
 from ..utils.utils import AverageMeter
 from .train_utils import restore_checkpoint,model_device
+from .metrics import MultiLabelReport
 
 # 训练包装器
 class Trainer(object):
@@ -18,6 +19,7 @@ class Trainer(object):
                  criterion,
                  evaluate,
                  lr_scheduler,
+                 label_to_id,
                  verbose=1,
                  n_gpu            = None,
                  resume           = None,
@@ -39,22 +41,21 @@ class Trainer(object):
         self.evaluate         = evaluate           # 评估指标
         self.criterion        = criterion
         self.lr_scheduler     = lr_scheduler
+        self.label_to_id      = label_to_id
         self.n_gpu            = n_gpu              # gpu个数，列表形式
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self._reset()
 
     def _reset(self):
-
-        self.batch_num         = len(self.train_data)
-        self.progressbar       = ProgressBar(n_batch = self.batch_num,eval_name='acc',loss_name='loss')
+        id_to_label = {value:key for key,value in self.label_to_id.items()}
+        self.batch_num  = len(self.train_data)
+        self.train_report = MultiLabelReport(id_to_label,sigmoid=True)
+        self.valid_report = MultiLabelReport(id_to_label, sigmoid=True)
+        self.progressbar = ProgressBar(n_batch = self.batch_num,loss_name='loss')
         self.model,self.device = model_device(n_gpu=self.n_gpu,model = self.model,logger = self.logger)
-        self.start_epoch       = 1
-        self.global_step       = 0
+        self.start_epoch = 1
+        self.global_step = 0
 
-        # if self.device == 'cpu':
-        #     self.input_type = torch.LongTensor
-        # else:
-        #     self.input_type = torch.cuda.LongTensor
         # 重载模型，进行训练
         if self.resume:
             arch = self.model_checkpoint.arch
@@ -98,26 +99,28 @@ class Trainer(object):
         predicts   = []
         targets    = []
         self.model.eval()
+        self.valid_report._reset()
         with torch.no_grad():
             for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(self.val_data):
                 input_ids = input_ids.to(self.device)
                 input_mask = input_mask.to(self.device)
                 segment_ids = segment_ids.to(self.device)
                 target = label_ids.to(self.device)
+
                 logits = self.model(input_ids, segment_ids,input_mask)
                 loss = self.criterion(target=target, output=logits)
                 val_loss += loss.item()
                 predicts.append(logits)
                 targets.append(target)
                 count += 1
+                self.valid_report.update(output=logits, target=target)
 
             predicts = torch.cat(predicts,dim = 0)
             targets = torch.cat(targets,dim = 0)
-            val_acc, val_auc = self.evaluate(output=predicts, target=targets)
+            val_auc = self.evaluate(output=predicts, target=targets)
 
         return {
             'val_loss': val_loss / count,
-            'val_acc': val_acc,
             'val_auc': val_auc
         }
 
@@ -125,9 +128,8 @@ class Trainer(object):
     def _train_epoch(self):
         self.model.train()
         train_loss = AverageMeter()
-        train_acc  = AverageMeter()
+        self.train_report._reset()
         for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(self.train_data):
-
             start = time.time()
             input_ids = input_ids.to(self.device)
             input_mask = input_mask.to(self.device)
@@ -136,7 +138,7 @@ class Trainer(object):
 
             logits = self.model(input_ids, segment_ids,input_mask)
             loss = self.criterion(output=logits,target=target)
-            acc, _ = self.evaluate(output=logits, target=target)
+            self.train_report.update(output = logits,target = target)
 
             # 如果梯度更新累加step>1，则也需要进行mean操作
             if self.gradient_accumulation_steps > 1:
@@ -148,17 +150,15 @@ class Trainer(object):
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.global_step += 1
+
             train_loss.update(loss.item(),input_ids.size(0))
-            train_acc.update(acc,input_ids.size(0))
             if self.verbose >= 1:
                 self.progressbar.step(batch_idx= step,
                                       loss     = loss.item(),
-                                      acc      = acc,
                                       use_time = time.time() - start)
         print("\ntraining result:")
         train_log = {
             'loss': train_loss.avg,
-            'acc': train_acc.avg,
         }
         return train_log
 
@@ -172,8 +172,13 @@ class Trainer(object):
             val_log = self._valid_epoch()
 
             logs = dict(train_log,**val_log)
-            self.logger.info('\nEpoch: %d - loss: %.4f acc: %.4f - val_loss: %.4f - val_acc: %.4f - val_auc: %.4f'%(
-                            epoch,logs['loss'],logs['acc'],logs['val_loss'],logs['val_acc'],logs['val_auc']))
+            self.logger.info('\nEpoch: %d - loss: %.4f - val_loss: %.4f - val_auc: %.4f'%(
+                            epoch,logs['loss'],logs['val_loss'],logs['val_auc']))
+
+            print("---- train report every label -----")
+            self.train_report.result()
+            print("---- valid report every label -----")
+            self.valid_report.result()
 
             if self.training_monitor:
                 self.training_monitor.step(logs)

@@ -2,7 +2,7 @@
 import torch
 import warnings
 from pytorch_pretrained_bert.optimization import BertAdam
-from pybert.train.metrics import AUCThresh
+from pybert.train.metrics import AUC
 from pybert.train.losses import BCEWithLogLoss
 from pybert.train.trainer import Trainer
 from torch.utils.data import DataLoader
@@ -16,6 +16,7 @@ from pybert.model.nn.bert_fine import BertFine
 from pybert.preprocessing.preprocessor import Preprocessor
 from pybert.callback.modelcheckpoint import ModelCheckpoint
 from pybert.callback.trainingmonitor import TrainingMonitor
+from pytorch_pretrained_bert.tokenization import BertTokenizer
 warnings.filterwarnings("ignore")
 
 # 主函数
@@ -41,15 +42,18 @@ def main():
                                        stratify    = False)
     # 读取数据集以及数据划分
     data_transformer.read_data()
+
+    tokenizer = BertTokenizer(vocab_file=config['vocab_path'],do_lower_case=config['do_lower_case'])
+
     # train
     train_dataset   = CreateDataset(data_path    = config['train_file_path'],
-                                    vocab_path   = config['vocab_path'],
+                                    tokenizer    = tokenizer,
                                     max_seq_len  = config['max_seq_len'],
                                     seed         = config['seed'],
                                     example_type = 'train')
     # valid
     valid_dataset   = CreateDataset(data_path    = config['valid_file_path'],
-                                    vocab_path   = config['vocab_path'],
+                                    tokenizer    = tokenizer,
                                     max_seq_len  = config['max_seq_len'],
                                     seed         = config['seed'],
                                     example_type = 'valid')
@@ -125,7 +129,8 @@ def main():
                       resume           = config['resume'],
                       lr_scheduler     = lr_scheduler,
                       n_gpu            = config['n_gpus'],
-                      evaluate         = AUCThresh(thresh=0.5,sigmoid=True))
+                      label_to_id      = config['label_to_id'],
+                      evaluate         = AUC(sigmoid=True))
     # 查看模型结构
     trainer.summary()
     # 拟合模型

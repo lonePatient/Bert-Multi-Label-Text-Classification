@@ -67,7 +67,6 @@ def pkl_write(filename,data):
 def text_write(filename,data):
     with open(filename,'w') as fw:
         for sentence,target in tqdm(data,desc = 'write data to disk'):
-            sentence = [str(x) for x in sentence]
             target  = [str(x) for x in target]
-            line = '\t'.join([",".join(target),' '.join(sentence)])
+            line = '\t'.join([",".join(target),sentence])
             fw.write(line +'\n')

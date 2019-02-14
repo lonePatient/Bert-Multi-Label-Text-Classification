@@ -1,4 +1,6 @@
 #encoding:utf-8
+import csv
+import pandas as pd
 import random
 from tqdm import tqdm
 from ..utils.utils import text_write
@@ -67,24 +69,20 @@ class DataTransformer(object):
             train = data[test_size:]
             return train, valid
 
-
     # 读取原始数据集
     def read_data(self):
         targets,sentences = [],[]
-        with open(self.raw_data_path,'r') as fr:
-            for i,line in enumerate(fr):
-                # 如果首行为列名，则skip_header=True
-                if i == 0 and self.skip_header:
-                    continue
-                lines = line.strip().split(',')
-                target = lines[2:]
-                sentence = str(lines[1])
-                # 预处理
-                if self.preprocess:
-                    sentence = self.preprocess(sentence)
-                if sentence:
-                    targets.append(target)
-                    sentences.append(sentence)
+        data = pd.read_csv(self.raw_data_path)
+        for row in tqdm(data.values):
+            target = row[2:]
+            sentence = str(row[1])
+            # 预处理
+            if self.preprocess:
+                sentence = self.preprocess(sentence)
+            if sentence:
+                targets.append(target)
+                sentences.append(sentence)
+
         # 保存数据
         if self.valid_size:
             train,valid = self.train_val_split(X = sentences,y = targets,stratify=self.stratify)

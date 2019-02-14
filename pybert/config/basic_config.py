@@ -26,22 +26,23 @@ configs = {
     'checkpoint_dir': path.sep.join([BASE_DIR, 'output/checkpoints']),# 模型保存路径
     'cache_dir': path.sep.join([BASE_DIR,'model/']),
 
-    'vocab_path': path.sep.join([BASE_DIR, 'model/pretrain/bert-base-uncased/vocab.txt']),
-    'tf_checkpoint_path': path.sep.join([BASE_DIR, 'model/pretrain/bert-base-uncased/bert_model.ckpt']),
-    'bert_config_file': path.sep.join([BASE_DIR, 'model/pretrain/bert-base-uncased/bert_config.json']),
+    # tensorflow版本pretrained Bert模型
+    'vocab_path': path.sep.join([BASE_DIR, 'model/pretrain/uncased_L-12_H-768_A-12/vocab.txt']),
+    'tf_checkpoint_path': path.sep.join([BASE_DIR, 'model/pretrain/uncased_L-12_H-768_A-12/bert_model.ckpt']),
+    'bert_config_file': path.sep.join([BASE_DIR, 'model/pretrain/uncased_L-12_H-768_A-12/bert_config.json']),
     'pytorch_model_path': path.sep.join([BASE_DIR, 'model/pretrain/pytorch_pretrain/pytorch_model.bin']),
     'bert_model_dir': path.sep.join([BASE_DIR, 'model/pretrain/pytorch_pretrain']),
 
-    'valid_size': 0.1, # valid数据集大小
-    'max_seq_len': 512,  # word文本平均长度,按照覆盖95%样本的标准，取截断长度:np.percentile(list,95.0)
-
-    'batch_size': 16,   # how many samples to process at once
+    'valid_size': 0.2, # valid数据集大小
+    'max_seq_len': 256,  # word文本平均长度,按照覆盖95%样本的标准，取截断长度:np.percentile(list,95.0)
+    'do_lower_case':True,
+    'batch_size': 15,   # how many samples to process at once
     'epochs': 5,       # number of epochs to train
     'start_epoch': 1,
     'warmup_proportion': 0.1, # Proportion of training to perform linear learning rate warmup for. E.g., 0.1 = 10%% of training.
     'gradient_accumulation_steps':1, # Number of updates steps to accumulate before performing a backward/update pass.
     'learning_rate': 2e-5,
-    'n_gpus': [1,0], # GPU个数,如果只写一个数字，则表示gpu标号从0开始，并且默认使用gpu:0作为controller,
+    'n_gpus': [0], # GPU个数,如果只写一个数字，则表示gpu标号从0开始，并且默认使用gpu:0作为controller,
                      # 如果以列表形式表示，即[1,3,5],则我们默认list[0]作为controller
 
     'num_workers': multiprocessing.cpu_count(), # 线程个数

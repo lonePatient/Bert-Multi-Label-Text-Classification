@@ -2,7 +2,6 @@
 import csv
 import numpy as np
 from torch.utils.data import Dataset
-from pytorch_pretrained_bert.tokenization import BertTokenizer
 
 class InputExample(object):
     def __init__(self, guid, text_a, text_b=None, label=None):
@@ -29,18 +28,16 @@ class InputFeature(object):
         self.label_id    = label_id
 
 class CreateDataset(Dataset):
-    def __init__(self,data_path,max_seq_len,vocab_path,example_type,seed):
+    def __init__(self,data_path,max_seq_len,tokenizer,example_type,seed):
         self.seed    = seed
         self.max_seq_len  = max_seq_len
         self.example_type = example_type
         self.data_path  = data_path
-        self.vocab_path = vocab_path
+        self.tokenizer = tokenizer
         self.reset()
 
     # 初始化
     def reset(self):
-        # 加载语料库，这是pretrained Bert模型自带的
-        self.tokenizer = BertTokenizer(vocab_file=self.vocab_path)
         # 构建examples
         self.build_examples()
 
@@ -64,7 +61,7 @@ class CreateDataset(Dataset):
         self.examples = []
         for i,line in enumerate(lines):
             guid = '%s-%d'%(self.example_type,i)
-            label = [int(x) for x in line[0].split(',')]
+            label = [np.float32(x) for x in line[0].split(',')] # RuntimeError: expected type torch.cuda.DoubleTensor but got torch.cuda.FloatTensor
             text_a = line[1]
             example = InputExample(guid = guid,text_a = text_a,label= label)
             self.examples.append(example)
@@ -102,7 +99,7 @@ class CreateDataset(Dataset):
         segment_ids += padding
 
         # 标签
-        label_id = int(example.label)
+        label_id = example.label
         feature = InputFeature(input_ids = input_ids,input_mask = input_mask,
                                segment_ids = segment_ids,label_id = label_id)
         return feature

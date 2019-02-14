@@ -124,8 +124,8 @@ class Preprocessor(object):
 
     def remove_breaks(self,sentence):
         # Remove line breaks
-        sentence_repl = sentence.replace("\r", " ")
-        sentence_repl = sentence_repl.replace("\n", " ")
+        sentence_repl = sentence.replace("\r", "")
+        sentence_repl = sentence_repl.replace("\n", "")
         sentence_repl = re.sub(r"\\n\n", ".", sentence_repl)
         return sentence_repl
 
