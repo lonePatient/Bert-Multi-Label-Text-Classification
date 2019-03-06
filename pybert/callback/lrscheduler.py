@@ -1,16 +1,37 @@
 #encoding:utf-8
+import math
 import numpy as np
 import warnings
 from torch.optim.optimizer import Optimizer
 
-class StepLr(object):
+
+__all__ = ['CustomDecayLR',
+           'BertLR',
+           'CyclicLR',
+           'ReduceLROnPlateau',
+           'ReduceLRWDOnPlateau',
+           'CosineLRWithRestarts',
+           ]
+
+class CustomDecayLR(object):
+    '''
+    自定义学习率变化机制
+        Example:
+        >>> scheduler = CustomDecayLR(optimizer)
+        >>> for epoch in range(100):
+        >>>     scheduler.epoch_step()
+        >>>     train(...)
+        >>>         ...
+        >>>         optimizer.zero_grad()
+        >>>         loss.backward()
+        >>>         optimizer.step()
+        >>>     validate(...)
+    '''
     def __init__(self,optimizer,lr):
-        super(StepLr,self).__init__()
         self.optimizer = optimizer
         self.lr = lr
-        self.use = 'on_epoch_end'
 
-    def step(self,epoch):
+    def epoch_step(self,epoch):
         lr = self.lr
         if epoch > 12:
             lr = lr / 1000
@@ -21,20 +42,23 @@ class StepLr(object):
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
 
-class CustomDecay(object):
-    def __init__(self,optimtizer):
-        super(CustomDecay,self).__init__()
-        self.optimizer = optimtizer
-
-    def step(self,epoch):
-        if epoch % 2 != 0:
-            for param_group in self.optimizer.param_groups:
-                param_group["lr"] = param_group['lr'] * 0.1
-
-class BertLr(object):
-    def __init__(self,optimizer,lr,t_total,warmup):
-        super(BertLr,self).__init__()
-        self.lr = lr
+class BertLR(object):
+    '''
+    Bert模型内定的学习率变化机制
+    Example:
+        >>> scheduler = BertLR(optimizer)
+        >>> for epoch in range(100):
+        >>>     scheduler.step()
+        >>>     train(...)
+        >>>         ...
+        >>>         optimizer.zero_grad()
+        >>>         loss.backward()
+        >>>         optimizer.step()
+        >>>         scheduler.batch_step()
+        >>>     validate(...)
+    '''
+    def __init__(self,optimizer,learning_rate,t_total,warmup):
+        self.learning_rate = learning_rate
         self.optimizer = optimizer
         self.t_total = t_total
         self.warmup = warmup
@@ -45,13 +69,26 @@ class BertLr(object):
             return x / warmup
         return 1.0 - x
 
-    def step(self,training_step):
-        lr_this_step = self.lr * self.warmup_linear(training_step / self.t_total,self.warmup)
+    def batch_step(self,training_step):
+        lr_this_step = self.learning_rate * self.warmup_linear(training_step / self.t_total,self.warmup)
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr_this_step
 
-
 class CyclicLR(object):
+    '''
+    Cyclical learning rates for training neural networks
+    Example:
+        >>> scheduler = CyclicLR(optimizer)
+        >>> for epoch in range(100):
+        >>>     scheduler.step()
+        >>>     train(...)
+        >>>         ...
+        >>>         optimizer.zero_grad()
+        >>>         loss.backward()
+        >>>         optimizer.step()
+        >>>         scheduler.batch_step()
+        >>>     validate(...)
+    '''
     def __init__(self, optimizer, base_lr=1e-3, max_lr=6e-3,
                  step_size=2000, mode='triangular', gamma=1.,
                  scale_fn=None, scale_mode='cycle', last_batch_iteration=-1):
@@ -59,6 +96,7 @@ class CyclicLR(object):
         if not isinstance(optimizer, Optimizer):
             raise TypeError('{} is not an Optimizer'.format(
                 type(optimizer).__name__))
+
         self.optimizer = optimizer
 
         if isinstance(base_lr, list) or isinstance(base_lr, tuple):
@@ -166,13 +204,14 @@ class ReduceLROnPlateau(object):
         >>> for epoch in range(10):
         >>>     train(...)
         >>>     val_acc, val_loss = validate(...)
-        >>>     scheduler.step(val_loss, epoch)
+        >>>     scheduler.epoch_step(val_loss, epoch)
     """
 
     def __init__(self, optimizer, mode='min', factor=0.1, patience=10,
-                 verbose=0, epsilon=1e-4, cooldown=0, min_lr=0):
-        super(ReduceLROnPlateau, self).__init__()
+                 verbose=0, epsilon=1e-4, cooldown=0, min_lr=0,eps=1e-8):
 
+        super(ReduceLROnPlateau, self).__init__()
+        assert isinstance(optimizer, Optimizer)
         if factor >= 1.0:
             raise ValueError('ReduceLROnPlateau '
                              'does not support a factor >= 1.0.')
@@ -187,9 +226,8 @@ class ReduceLROnPlateau(object):
         self.wait = 0
         self.best = 0
         self.mode = mode
-        assert isinstance(optimizer, Optimizer)
         self.optimizer = optimizer
-        self.use = 'on_epoch_end'
+        self.eps = eps
         self._reset()
 
     def _reset(self):
@@ -205,12 +243,11 @@ class ReduceLROnPlateau(object):
             self.best = -np.Inf
         self.cooldown_counter = 0
         self.wait = 0
-        self.lr_epsilon = self.min_lr * 1e-4
 
     def reset(self):
         self._reset()
 
-    def step(self, metrics, epoch):
+    def epoch_step(self, metrics, epoch):
         current = metrics
         if current is None:
             warnings.warn('Learning Rate Plateau Reducing requires metrics available!', RuntimeWarning)
@@ -226,7 +263,7 @@ class ReduceLROnPlateau(object):
                 if self.wait >= self.patience:
                     for param_group in self.optimizer.param_groups:
                         old_lr = float(param_group['lr'])
-                        if old_lr > self.min_lr + self.lr_epsilon:
+                        if old_lr > self.min_lr + self.eps:
                             new_lr = old_lr * self.factor
                             new_lr = max(new_lr, self.min_lr)
                             param_group['lr'] = new_lr
@@ -238,3 +275,173 @@ class ReduceLROnPlateau(object):
 
     def in_cooldown(self):
         return self.cooldown_counter > 0
+
+class ReduceLRWDOnPlateau(ReduceLROnPlateau):
+    """Reduce learning rate and weight decay when a metric has stopped
+    improving. Models often benefit from reducing the learning rate by
+    a factor of 2-10 once learning stagnates. This scheduler reads a metric
+    quantity and if no improvement is seen for a 'patience' number
+    of epochs, the learning rate and weight decay factor is reduced for
+    optimizers that implement the the weight decay method from the paper
+    `Fixing Weight Decay Regularization in Adam`_.
+
+    .. _Fixing Weight Decay Regularization in Adam:
+        https://arxiv.org/abs/1711.05101
+    for AdamW or SGDW
+    Example:
+        >>> optimizer = AdamW(model.parameters(), lr=0.1, weight_decay=1e-3)
+        >>> scheduler = ReduceLRWDOnPlateau(optimizer, 'min')
+        >>> for epoch in range(10):
+        >>>     train(...)
+        >>>     val_loss = validate(...)
+        >>>     # Note that step should be called after validate()
+        >>>     scheduler.epoch_step(val_loss)
+    """
+    def epoch_step(self, metrics, epoch):
+        current = metrics
+        if current is None:
+            warnings.warn('Learning Rate Plateau Reducing requires metrics available!', RuntimeWarning)
+        else:
+            if self.in_cooldown():
+                self.cooldown_counter -= 1
+                self.wait = 0
+
+            if self.monitor_op(current, self.best):
+                self.best = current
+                self.wait = 0
+            elif not self.in_cooldown():
+                if self.wait >= self.patience:
+                    for param_group in self.optimizer.param_groups:
+                        old_lr = float(param_group['lr'])
+                        if old_lr > self.min_lr + self.eps:
+                            new_lr = old_lr * self.factor
+                            new_lr = max(new_lr, self.min_lr)
+                            param_group['lr'] = new_lr
+                            if self.verbose > 0:
+                                print('\nEpoch %d: reducing learning rate to %s.' % (epoch, new_lr))
+                        if param_group['weight_decay'] != 0:
+                            old_weight_decay = float(param_group['weight_decay'])
+                            new_weight_decay = max(old_weight_decay * self.factor, self.min_lr)
+                            if old_weight_decay > new_weight_decay + self.eps:
+                                param_group['weight_decay'] = new_weight_decay
+                                if self.verbose:
+                                    print('\nEpoch {epoch}: reducing weight decay factor of group {i} to {new_weight_decay:.4e}.')
+                    self.cooldown_counter = self.cooldown
+                    self.wait = 0
+                self.wait += 1
+
+class CosineLRWithRestarts(object):
+    """Decays learning rate with cosine annealing, normalizes weight decay
+    hyperparameter value, implements restarts.
+    https://arxiv.org/abs/1711.05101
+
+    Args:
+        optimizer (Optimizer): Wrapped optimizer.
+        batch_size: minibatch size
+        epoch_size: training samples per epoch
+        restart_period: epoch count in the first restart period
+        t_mult: multiplication factor by which the next restart period will extend/shrink
+
+    Example:
+        >>> scheduler = CosineLRWithRestarts(optimizer, 32, 1024, restart_period=5, t_mult=1.2)
+        >>> for epoch in range(100):
+        >>>     scheduler.step()
+        >>>     train(...)
+        >>>         ...
+        >>>         optimizer.zero_grad()
+        >>>         loss.backward()
+        >>>         optimizer.step()
+        >>>         scheduler.batch_step()
+        >>>     validate(...)
+    """
+
+    def __init__(self, optimizer, batch_size, epoch_size, restart_period=100,
+                 t_mult=2, last_epoch=-1, eta_threshold=1000, verbose=False):
+        if not isinstance(optimizer, Optimizer):
+            raise TypeError('{} is not an Optimizer'.format(
+                type(optimizer).__name__))
+        self.optimizer = optimizer
+        if last_epoch == -1:
+            for group in optimizer.param_groups:
+                group.setdefault('initial_lr', group['lr'])
+        else:
+            for i, group in enumerate(optimizer.param_groups):
+                if 'initial_lr' not in group:
+                    raise KeyError("param 'initial_lr' is not specified "
+                                   "in param_groups[{}] when resuming an"
+                                   " optimizer".format(i))
+        self.base_lrs = list(map(lambda group: group['initial_lr'],
+                                 optimizer.param_groups))
+
+        self.last_epoch = last_epoch
+        self.batch_size = batch_size
+        self.iteration = 0
+        self.epoch_size = epoch_size
+        self.eta_threshold = eta_threshold
+        self.t_mult = t_mult
+        self.verbose = verbose
+        self.base_weight_decays = list(map(lambda group: group['weight_decay'],
+                                           optimizer.param_groups))
+        self.restart_period = restart_period
+        self.restarts = 0
+        self.t_epoch = -1
+        self.batch_increments = []
+        self._set_batch_increment()
+
+    def _schedule_eta(self):
+        """
+        Threshold value could be adjusted to shrink eta_min and eta_max values.
+        """
+        eta_min = 0
+        eta_max = 1
+        if self.restarts <= self.eta_threshold:
+            return eta_min, eta_max
+        else:
+            d = self.restarts - self.eta_threshold
+            k = d * 0.09
+            return (eta_min + k, eta_max - k)
+
+    def get_lr(self, t_cur):
+        eta_min, eta_max = self._schedule_eta()
+
+        eta_t = (eta_min + 0.5 * (eta_max - eta_min)
+                 * (1. + math.cos(math.pi *
+                                  (t_cur / self.restart_period))))
+
+        weight_decay_norm_multi = math.sqrt(self.batch_size /
+                                            (self.epoch_size *
+                                             self.restart_period))
+        lrs = [base_lr * eta_t for base_lr in self.base_lrs]
+        weight_decays = [base_weight_decay * eta_t * weight_decay_norm_multi
+                         for base_weight_decay in self.base_weight_decays]
+
+        if self.t_epoch % self.restart_period < self.t_epoch:
+            if self.verbose:
+                print("Restart at epoch {}".format(self.last_epoch))
+            self.restart_period *= self.t_mult
+            self.restarts += 1
+            self.t_epoch = 0
+
+        return zip(lrs, weight_decays)
+
+    def _set_batch_increment(self):
+        d, r = divmod(self.epoch_size, self.batch_size)
+        batches_in_epoch = d + 2 if r > 0 else d + 1
+        self.iteration = 0
+        self.batch_increments = list(np.linspace(0, 1, batches_in_epoch))
+
+    def batch_step(self):
+        self.last_epoch += 1
+        self.t_epoch += 1
+        self._set_batch_increment()
+        try:
+            t_cur = self.t_epoch + self.batch_increments[self.iteration]
+            self.iteration += 1
+        except (IndexError):
+            raise RuntimeError("Epoch size and batch size used in the "
+                               "training loop and while initializing "
+                               "scheduler should be the same.")
+
+        for param_group, (lr, weight_decay) in zip(self.optimizer.param_groups,self.get_lr(t_cur)):
+            param_group['lr'] = lr
+            param_group['weight_decay'] = weight_decay

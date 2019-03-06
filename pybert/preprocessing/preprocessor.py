@@ -61,16 +61,25 @@ replacement = {
     "tryin'":"trying",
 }
 
-class Preprocessor(object):
+class EnglishPreProcessor(object):
     def __init__(self,min_len = 2,stopwords_path = None):
         self.min_len = min_len
         self.stopwords_path = stopwords_path
         self.reset()
-    #大写转化为小写
+
     def lower(self,sentence):
+        '''
+        大写转化为小写
+        :param sentence:
+        :return:
+        '''
         return sentence.lower()
-    # 加载停用词
+
     def reset(self):
+        '''
+        加载停用词
+        :return:
+        '''
         if self.stopwords_path:
             with open(self.stopwords_path,'r') as fr:
                 self.stopwords = {}
@@ -78,12 +87,22 @@ class Preprocessor(object):
                     word = line.strip(' ').strip('\n')
                     self.stopwords[word] = 1
 
-    # 去除长度小于min_len的文本
+
     def clean_length(self,sentence):
+        '''
+        去除长度小于min_len的文本
+        :param sentence:
+        :return:
+        '''
         if len([x for x in sentence]) >= self.min_len:
             return sentence
 
     def replace(self,sentence):
+        '''
+        一些特殊缩写替换
+        :param sentence:
+        :return:
+        '''
         # Replace words like gooood to good
         sentence = re.sub(r'(\w)\1{2,}', r'\1\1', sentence)
         # Normalize common abbreviations
@@ -93,6 +112,11 @@ class Preprocessor(object):
         return sentence_repl
 
     def remove_website(self,sentence):
+        '''
+        处理网址符号
+        :param sentence:
+        :return:
+        '''
         sentence_repl = sentence.replace(r"http\S+", "")
         sentence_repl = sentence_repl.replace(r"https\S+", "")
         sentence_repl = sentence_repl.replace(r"http", "")
@@ -105,6 +129,11 @@ class Preprocessor(object):
         return sentence_repl
 
     def remove_time(self,sentence):
+        '''
+        特殊数据处理
+        :param sentence:
+        :return:
+        '''
         # Remove time related text
         sentence_repl = sentence.replace(r'\w{3}[+-][0-9]{1,2}\:[0-9]{2}\b', "")  # e.g. UTC+09:00
         sentence_repl = sentence_repl.replace(r'\d{1,2}\:\d{2}\:\d{2}', "")  # e.g. 18:09:01
@@ -154,8 +183,13 @@ class Preprocessor(object):
         sentence_repl = re.sub(r"肏你妈", "fuck your mother", sentence_repl)
         sentence_repl = re.sub(r"肏你祖宗十八代", "your ancestors to the 18th generation", sentence_repl)
         return sentence_repl
-    # 全角转化为半角
+
     def full2half(self,sentence):
+        '''
+        全角转化为半角
+        :param sentence:
+        :return:
+        '''
         ret_str = ''
         for i in sentence:
             if ord(i) >= 33 + 65248 and ord(i) <= 126 + 65248:
@@ -164,8 +198,12 @@ class Preprocessor(object):
                 ret_str += i
         return ret_str
 
-    #去除停用词
     def remove_stopword(self,sentence):
+        '''
+        去除停用词
+        :param sentence:
+        :return:
+        '''
         words = sentence.split()
         x = [word for word in words if word not in self.stopwords]
         return " ".join(x)
@@ -183,4 +221,3 @@ class Preprocessor(object):
         x = self.adjust_common(x)
         x = self.remove_chinese(x)
         return x
-

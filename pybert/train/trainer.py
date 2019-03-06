@@ -1,194 +1,194 @@
 #encoding:utf-8
-import os
 import time
-import numpy as np
 import torch
 from ..callback.progressbar import ProgressBar
-from ..utils.utils import AverageMeter
-from .train_utils import restore_checkpoint,model_device
-from .metrics import MultiLabelReport
-
+from ..utils.utils import restore_checkpoint,model_device
+from ..utils.utils import summary
 # 训练包装器
 class Trainer(object):
-    def __init__(self,model,
-                 train_data,
-                 val_data,
-                 optimizer,
-                 epochs,
-                 logger,
-                 criterion,
-                 evaluate,
-                 lr_scheduler,
-                 label_to_id,
-                 verbose=1,
-                 n_gpu            = None,
-                 resume           = None,
-                 model_checkpoint = None,
-                 training_monitor = None,
-                 early_stopping   = None,
-                 gradient_accumulation_steps=1):
-        self.model            = model              # 模型
-        self.train_data       = train_data         # 训练数据
-        self.val_data         = val_data           # 验证数据
-        self.epochs           = epochs             # epochs次数
-        self.optimizer        = optimizer          # 优化器
-        self.logger           = logger             # 日志记录器
-        self.verbose          = verbose            # 是否打印
-        self.training_monitor = training_monitor   # 监控训练过程指标变化
-        self.early_stopping   = early_stopping     # early_stopping
-        self.resume           = resume             # 是否重载模型
-        self.model_checkpoint = model_checkpoint   # 模型保存
-        self.evaluate         = evaluate           # 评估指标
-        self.criterion        = criterion
-        self.lr_scheduler     = lr_scheduler
-        self.label_to_id      = label_to_id
-        self.n_gpu            = n_gpu              # gpu个数，列表形式
-        self.gradient_accumulation_steps = gradient_accumulation_steps
-        self._reset()
+    def __init__(self,train_configs):
 
-    def _reset(self):
-        id_to_label = {value:key for key,value in self.label_to_id.items()}
-        self.batch_num  = len(self.train_data)
-        self.train_report = MultiLabelReport(id_to_label,sigmoid=True)
-        self.valid_report = MultiLabelReport(id_to_label, sigmoid=True)
-        self.progressbar = ProgressBar(n_batch = self.batch_num,loss_name='loss')
-        self.model,self.device = model_device(n_gpu=self.n_gpu,model = self.model,logger = self.logger)
         self.start_epoch = 1
         self.global_step = 0
+        self.n_gpu = train_configs['n_gpu']
+        self.model = train_configs['model']
+        self.epochs = train_configs['epochs']
+        self.logger = train_configs['logger']
+        self.verbose = train_configs['verbose']
+        self.criterion = train_configs['criterion']
+        self.optimizer = train_configs['optimizer']
+        self.lr_scheduler = train_configs['lr_scheduler']
+        self.early_stopping = train_configs['early_stopping']
+        self.epoch_metrics = train_configs['epoch_metrics']
+        self.batch_metrics = train_configs['batch_metrics']
+        self.model_checkpoint = train_configs['model_checkpoint']
+        self.training_monitor = train_configs['training_monitor']
+        self.gradient_accumulation_steps = train_configs['gradient_accumulation_steps']
 
+        self.model, self.device = model_device(n_gpu = self.n_gpu, model=self.model, logger=self.logger)
         # 重载模型，进行训练
-        if self.resume:
-            arch = self.model_checkpoint.arch
-            resume_path = os.path.join(self.model_checkpoint.checkpoint_dir.format(arch = arch),
-                                       self.model_checkpoint.best_model_name.format(arch = arch))
-            self.logger.info("\nLoading checkpoint: {} ...".format(resume_path))
-            resume_list = restore_checkpoint(resume_path = resume_path,model = self.model,optimizer = self.optimizer)
-            self.model     = resume_list[0]
+        if train_configs['resume']:
+            self.logger.info(f"\nLoading checkpoint: {train_configs['resume']}")
+            resume_list = restore_checkpoint(resume_path =train_configs['resume'],model = self.model,optimizer = self.optimizer)
+            best = resume_list[2]
+            self.model = resume_list[0]
             self.optimizer = resume_list[1]
-            best           = resume_list[2]
             self.start_epoch = resume_list[3]
-
             if self.model_checkpoint:
                 self.model_checkpoint.best = best
-            self.logger.info("\nCheckpoint '{}' (epoch {}) loaded".format(resume_path, self.start_epoch))
+            self.logger.info(f"\nCheckpoint '{train_configs['resume']}' and epoch {self.start_epoch} loaded")
 
-    def summary(self):
-        model_parameters = filter(lambda p: p.requires_grad, self.model.parameters())
-        # for p in model_parameters:
-        #     print(p.size())
-        params = sum([np.prod(p.size()) for p in model_parameters])
-        # 总的模型参数量
-        self.logger.info('trainable parameters: {:4}M'.format(params / 1000 / 1000))
-        # 模型结构
-        self.logger.info(self.model)
+    def epoch_reset(self):
+        self.outputs = []
+        self.targets = []
+        self.result = {}
+        for metric in self.epoch_metrics:
+            metric.reset()
 
-    # 保存模型信息
-    def _save_info(self,epoch,val_loss):
+    def batch_reset(self):
+        self.info = {}
+        for metric in self.batch_metrics:
+            metric.reset()
+
+
+    def _save_info(self,epoch,valid_loss):
+        '''
+        保存模型信息
+        '''
         state = {
             'epoch': epoch,
             'arch': self.model_checkpoint.arch,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
-            'val_loss': round(val_loss,4)
+            'valid_loss': round(valid_loss,4)
         }
         return state
 
-    # val数据集预测
-    def _valid_epoch(self):
-        val_loss,count = 0, 0
-        predicts   = []
-        targets    = []
+    def _valid_epoch(self,data):
+        '''
+        valid数据集评估
+        '''
+        self.epoch_reset()
         self.model.eval()
-        self.valid_report._reset()
         with torch.no_grad():
-            for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(self.val_data):
+            for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(data):
                 input_ids = input_ids.to(self.device)
                 input_mask = input_mask.to(self.device)
                 segment_ids = segment_ids.to(self.device)
-                target = label_ids.to(self.device)
-
+                label = label_ids.to(self.device)
                 logits = self.model(input_ids, segment_ids,input_mask)
-                loss = self.criterion(target=target, output=logits)
-                val_loss += loss.item()
-                predicts.append(logits)
-                targets.append(target)
-                count += 1
-                self.valid_report.update(output=logits, target=target)
+                self.outputs.append(logits.cpu().detach())
+                self.targets.append(label.cpu().detach())
 
-            predicts = torch.cat(predicts,dim = 0)
-            targets = torch.cat(targets,dim = 0)
-            val_auc = self.evaluate(output=predicts, target=targets)
+            self.outputs = torch.cat(self.outputs, dim = 0).cpu().detach()
+            self.targets = torch.cat(self.targets, dim = 0).cpu().detach()
+            loss = self.criterion(target = self.targets, output=self.outputs)
+            self.result['valid_loss'] = loss.item()
+            print("\n--------------------------valid result ------------------------------")
+            if self.epoch_metrics:
+                for metric in self.epoch_metrics:
+                    metric(logits=self.outputs, target=self.targets)
+                    value = metric.value()
+                    if value:
+                        self.result[f'valid_{metric.name()}'] = value
+            if len(self.n_gpu) > 0:
+                torch.cuda.empty_cache()
+            return self.result
 
-        return {
-            'val_loss': val_loss / count,
-            'val_auc': val_auc
-        }
-
-    # epoch训练
-    def _train_epoch(self):
+    def _train_epoch(self,data):
+        '''
+        epoch训练
+        :param data:
+        :return:
+        '''
+        self.epoch_reset()
         self.model.train()
-        train_loss = AverageMeter()
-        self.train_report._reset()
-        for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(self.train_data):
+        for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(data):
             start = time.time()
+            self.batch_reset()
             input_ids = input_ids.to(self.device)
             input_mask = input_mask.to(self.device)
             segment_ids = segment_ids.to(self.device)
-            target = label_ids.to(self.device)
-
+            label = label_ids.to(self.device)
             logits = self.model(input_ids, segment_ids,input_mask)
-            loss = self.criterion(output=logits,target=target)
-            self.train_report.update(output = logits,target = target)
-
+            # 计算batch loss
+            loss = self.criterion(output=logits,target=label)
+            if len(self.n_gpu) >= 2:
+                loss = loss.mean()
             # 如果梯度更新累加step>1，则也需要进行mean操作
             if self.gradient_accumulation_steps > 1:
                 loss = loss / self.gradient_accumulation_steps
             loss.backward()
             # 学习率更新方式
             if (step + 1) % self.gradient_accumulation_steps == 0:
-                self.lr_scheduler.step(training_step = self.global_step)
+                self.lr_scheduler.batch_step(training_step = self.global_step)
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.global_step += 1
 
-            train_loss.update(loss.item(),input_ids.size(0))
+            if self.batch_metrics:
+                for metric in self.batch_metrics:
+                    metric(logits = logits,target = label)
+                    self.info[metric.name()] = metric.value()
+
+            self.info['loss'] = loss.item()
             if self.verbose >= 1:
-                self.progressbar.step(batch_idx= step,
-                                      loss     = loss.item(),
-                                      use_time = time.time() - start)
-        print("\ntraining result:")
-        train_log = {
-            'loss': train_loss.avg,
-        }
-        return train_log
+                self.progressbar.batch_step(batch_idx= step,info = self.info,use_time=time.time() - start)
+            # 为了降低显存使用量
+            self.outputs.append(logits.cpu().detach())
+            self.targets.append(label.cpu().detach())
 
-    def train(self):
+        print("\n------------------------- train result ------------------------------")
+        # epoch metric
+        self.outputs = torch.cat(self.outputs, dim =0).cpu().detach()
+        self.targets = torch.cat(self.targets, dim =0).cpu().detach()
+        loss = self.criterion(target=self.targets, output=self.outputs)
+        self.result['loss'] = loss.item()
+
+        if self.epoch_metrics:
+            for metric in self.epoch_metrics:
+                metric(logits=self.outputs, target=self.targets)
+                value = metric.value()
+                if value:
+                    self.result[f'{metric.name()}'] = value
+        if len(self.n_gpu) > 0:
+            torch.cuda.empty_cache()
+        return self.result
+
+    def train(self,train_data,valid_data):
+        self.batch_num = len(train_data)
+        self.progressbar = ProgressBar(n_batch=self.batch_num)
+
+        print("model summary info: ")
+        for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(train_data):
+            input_ids = input_ids.to(self.device)
+            input_mask = input_mask.to(self.device)
+            segment_ids = segment_ids.to(self.device)
+            summary(self.model,*(input_ids, segment_ids,input_mask),show_input=True)
+            break
+        # ***************************************************************
         for epoch in range(self.start_epoch,self.start_epoch+self.epochs):
+            print("--------------------\nEpoch {epoch}/{self.epochs}------------------------")
+            train_log = self._train_epoch(train_data)
+            valid_log = self._valid_epoch(valid_data)
 
-            print("----------------- training start -----------------------")
-            print("Epoch {i}/{epochs}......".format(i=epoch, epochs=self.start_epoch+self.epochs -1))
-
-            train_log = self._train_epoch()
-            val_log = self._valid_epoch()
-
-            logs = dict(train_log,**val_log)
-            self.logger.info('\nEpoch: %d - loss: %.4f - val_loss: %.4f - val_auc: %.4f'%(
-                            epoch,logs['loss'],logs['val_loss'],logs['val_auc']))
-
-            print("---- train report every label -----")
-            self.train_report.result()
-            print("---- valid report every label -----")
-            self.valid_report.result()
-
+            logs = dict(train_log,**valid_log)
+            show_info = f'\nEpoch: {epoch} - ' + "-".join([f' {key}: {value:.4f} ' for key,value in logs.items()])
+            self.logger.info(show_info)
+            print("-----------------------------------------------------------------------")
+            # 保存训练过程中模型指标变化
             if self.training_monitor:
-                self.training_monitor.step(logs)
+                self.training_monitor.epoch_step(logs)
 
+            # save model
             if self.model_checkpoint:
-                state = self._save_info(epoch,val_loss = logs['val_loss'])
-                self.model_checkpoint.step(current=logs[self.model_checkpoint.monitor],state = state)
+                state = self._save_info(epoch,valid_loss = logs['valid_loss'])
+                self.model_checkpoint.epoch_step(current=logs[self.model_checkpoint.monitor],state = state)
 
+            # early_stopping
             if self.early_stopping:
-                self.early_stopping.step(epoch=epoch, current=logs[self.early_stopping.monitor])
+                self.early_stopping.epoch_step(epoch=epoch, current=logs[self.early_stopping.monitor])
                 if self.early_stopping.stop_training:
                     break
+
 

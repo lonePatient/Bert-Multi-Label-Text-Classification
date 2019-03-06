@@ -29,6 +29,7 @@ At the root of the project, you will see:
 |  └── utils # a set of utility functions
 ├── convert_tf_checkpoint_to_pytorch.py
 ├── train_bert_multi_label.py
+├── inference.py
 ```
 ## Dependencies
 
@@ -51,7 +52,8 @@ you need download pretrained bert model (`uncased_L-12_H-768_A-12`)
 3. Run `python convert_tf_checkpoint_to_pytorch.py` to transfer the pretrained model(tensorflow version)  into pytorch form .
 4. Prepare [kaggle data](https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/data), you can modify the `io.data_transformer.py` to adapt your data.
 5. Modify configuration information in `pybert/config/basic_config.py`(the path of data,...).
-6. Run `python train_bert_multi_label.py`.
+6. Run `python train_bert_multi_label.py` to fine tuning bert model.
+7. Run `python inference.py` to predict new data.
 
 ## Fine-tuning result
 

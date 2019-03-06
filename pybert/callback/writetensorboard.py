@@ -1,12 +1,15 @@
 #encoding:utf-8
-import os
 import importlib
 import warnings
-from ..utils.utils import ensure_dir
+from pathlib import Path
+
 class WriterTensorboardX():
     def __init__(self, writer_dir, logger, enable):
         self.writer = None
-        ensure_dir(writer_dir)
+
+        if not isinstance(writer_dir,Path):
+            writer_dir = Path(writer_dir)
+
         if enable:
             log_path = writer_dir
             try:
@@ -35,12 +38,12 @@ class WriterTensorboardX():
             add_data = getattr(self.writer, name, None)
             def wrapper(tag, data, *args, **kwargs):
                 if add_data is not None:
-                    add_data('{}/{}'.format(self.mode, tag), data, self.step, *args, **kwargs)
+                    add_data(f'{self.mode}/{tag}', data, self.step, *args, **kwargs)
             return wrapper
         else:
             # default action for returning methods defined in this class, set_step() for instance.
             try:
                 attr = object.__getattr__(name)
             except AttributeError:
-                raise AttributeError("type object 'WriterTensorboardX' has no attribute '{}'".format(name))
+                raise AttributeError(f"type object 'WriterTensorboardX' has no attribute '{name}'")
             return attr
