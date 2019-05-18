@@ -227,7 +227,7 @@ class F1Score(Metric):
                 print(f"Best thresh: {thresh:.4f} - F1 Score: {f1:.4f}")
 
         if self.task_type == 'multiclass':
-            self.y_pred = np.argmax(self.y_pred, 1)
+            self.y_pred = np.argmax(y_prob, 1)
 
     def reset(self):
         self.y_pred = 0
