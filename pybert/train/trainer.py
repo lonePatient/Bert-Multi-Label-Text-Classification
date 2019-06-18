@@ -168,7 +168,7 @@ class Trainer(object):
             break
         # ***************************************************************
         for epoch in range(self.start_epoch,self.start_epoch+self.epochs):
-            print("--------------------Epoch {epoch}/{self.epochs}------------------------")
+            print(f"--------------------Epoch {epoch}/{self.epochs}------------------------")
             train_log = self._train_epoch(train_data)
             valid_log = self._valid_epoch(valid_data)
 
