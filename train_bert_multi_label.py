@@ -15,8 +15,8 @@ from pybert.preprocessing.preprocessor import EnglishPreProcessor
 from pybert.callback.modelcheckpoint import ModelCheckpoint
 from pybert.callback.trainingmonitor import TrainingMonitor
 from pybert.train.metrics import F1Score,AccuracyThresh,MultiLabelReport
-from pytorch_pretrained_bert.tokenization import BertTokenizer
-from pytorch_pretrained_bert.optimization import BertAdam
+from pytorch_transformers.tokenization_bert import BertTokenizer
+from pytorch_transformers.optimization import AdamW
 warnings.filterwarnings("ignore")
 
 # 主函数

@@ -2,7 +2,7 @@
 
 This repo contains a PyTorch implementation of a pretrained BERT model  for multi-label text classification.
 
-**note**: for the new `pytorch-pretrained-bert` package . use comd `from pytorch_pretrained_bert.modeling import BertPreTrainedModel`
+**note**: for the new `pytorch_transformers` package . use comd `from pytorch_transformers.modeling_bert import BertPreTrainedModel`
 ## Structure of the code
 
 At the root of the project, you will see:
@@ -42,7 +42,7 @@ At the root of the project, you will see:
 - PyTorch 1.0
 - matplotlib
 - pandas
-- pytorch_pretrained_bert (load bert model)
+- pytorch_transformers (load bert model)
 
 ## How to use the code
 

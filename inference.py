@@ -10,7 +10,7 @@ from pybert.config.basic_config import configs as config
 from pybert.model.nn.bert_fine import BertFine
 from pybert.test.predicter import Predicter
 from pybert.preprocessing.preprocessor import EnglishPreProcessor
-from pytorch_pretrained_bert.tokenization import BertTokenizer
+from pytorch_transformers.tokenization_bert import BertTokenizer
 warnings.filterwarnings("ignore")
 
 # 主函数
