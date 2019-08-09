@@ -15,8 +15,8 @@ from pybert.preprocessing.preprocessor import EnglishPreProcessor
 from pybert.callback.modelcheckpoint import ModelCheckpoint
 from pybert.callback.trainingmonitor import TrainingMonitor
 from pybert.train.metrics import F1Score,AccuracyThresh,MultiLabelReport
-from pytorch_pretrained_bert.tokenization import BertTokenizer
-from pytorch_pretrained_bert.optimization import BertAdam
+from pytorch_transformers.tokenization_bert import BertTokenizer
+from pytorch_transformers.optimization import AdamW, WarmupLinearSchedule
 warnings.filterwarnings("ignore")
 
 # 主函数
@@ -89,10 +89,12 @@ def main():
         len(train_dataset.examples) / config['train']['batch_size'] / config['train']['gradient_accumulation_steps'] * config['train']['epochs'])
     # t_total: total number of training steps for the learning rate schedule
     # warmup: portion of t_total for the warmup
-    optimizer = BertAdam(optimizer_grouped_parameters,
-                         lr = config['train']['learning_rate'],
-                         warmup = config['train']['warmup_proportion'],
-                         t_total = num_train_steps)
+    optimizer = AdamW(optimizer_grouped_parameters,
+                      lr = config['train']['learning_rate'])
+
+    scheduler = WarmupLinearSchedule(optimizer, 
+                                     warmup_steps=config['train']['warmup_steps'], 
+                                     t_total=num_train_steps)
 
     # **************************** callbacks ***********************
     logger.info("initializing callbacks")
@@ -110,7 +112,7 @@ def main():
     lr_scheduler = BertLR(optimizer = optimizer,
                           learning_rate = config['train']['learning_rate'],
                           t_total = num_train_steps,
-                          warmup = config['train']['warmup_proportion'])
+                          warmup = config['train']['warmup_steps'])
 
     # **************************** training model ***********************
     logger.info('training model....')
@@ -119,6 +121,7 @@ def main():
         'model': model,
         'logger': logger,
         'optimizer': optimizer,
+        'scheduler': scheduler,
         'resume': config['train']['resume'],
         'epochs': config['train']['epochs'],
         'n_gpu': config['train']['n_gpu'],

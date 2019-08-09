@@ -16,6 +16,7 @@ class Trainer(object):
         self.logger = train_configs['logger']
         self.verbose = train_configs['verbose']
         self.criterion = train_configs['criterion']
+        self.scheduler = train_configs['scheduler']
         self.optimizer = train_configs['optimizer']
         self.lr_scheduler = train_configs['lr_scheduler']
         self.early_stopping = train_configs['early_stopping']
@@ -122,6 +123,7 @@ class Trainer(object):
             # 学习率更新方式
             if (step + 1) % self.gradient_accumulation_steps == 0:
                 self.lr_scheduler.batch_step(training_step = self.global_step)
+                self.scheduler.step()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.global_step += 1

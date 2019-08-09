@@ -4,7 +4,7 @@ import gc
 import numpy as np
 from pathlib import Path
 from torch.utils.data import Dataset
-from pytorch_pretrained_bert.tokenization import BertTokenizer
+from pytorch_transformers.tokenization_bert import BertTokenizer
 
 class InputExample(object):
     def __init__(self, guid, text_a, text_b=None, label=None):
