@@ -54,12 +54,12 @@ you need download pretrained bert model and xlnet model.
 3. Download the Bert vocab file from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-vocab.txt) 
 4. modify `bert-base-uncased-pytorch_model.bin` to `pytorch_model.bin` , `bert-base-uncased-config.json` to `config.json` ,`bert-base-uncased-vocab.txt` to `vocab.txt`
 5. place `model` ,`config` and `vocab` file into  the `/pybert/pretrain/bert/base-uncased` directory.
-2. `pip install pytorch-transformers` from [github](https://github.com/huggingface/pytorch-transformers).
-4. Prepare [kaggle data](https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/data), you can modify the `io.data_transformer.py` to adapt your data.
-5. Modify configuration information in `pybert/configs/basic_config.py`(the path of data,...).
-6. Run `python run_bert.py --do_data` to preprocess data.
-7. 6. Run `python run_bert.py --do_train --save_best --do_lower_case` to fine tuning bert model.
-7. Run `run_bert.py --do_test --do_lower_case` to predict new data.
+6. `pip install pytorch-transformers` from [github](https://github.com/huggingface/pytorch-transformers).
+7. Prepare [kaggle data](https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/data), you can modify the `io.data_transformer.py` to adapt your data.
+8. Modify configuration information in `pybert/configs/basic_config.py`(the path of data,...).
+9. Run `python run_bert.py --do_data` to preprocess data.
+10. Run `python run_bert.py --do_train --save_best --do_lower_case` to fine tuning bert model.
+11. Run `run_bert.py --do_test --do_lower_case` to predict new data.
 
 ### training 
 
