@@ -9,17 +9,17 @@ class Augmentator(object):
         self.augs = []
         self._reset()
 
-    # 总的增强列表
+
     def _reset(self):
         self.augs.append(lambda text: self._shuffle(text))
         self.augs.append(lambda text: self._dropout(text,p = 0.5))
 
-    # 打乱
+
     def _shuffle(self, text):
         text = np.random.permutation(text.strip().split())
         return ' '.join(text)
 
-    #随机删除一些
+
     def _dropout(self, text, p=0.5):
         # random delete some text
         text = text.strip().split()

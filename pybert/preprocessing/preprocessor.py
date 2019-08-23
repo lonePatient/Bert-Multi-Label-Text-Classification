@@ -211,7 +211,7 @@ class EnglishPreProcessor(object):
     # 主函数
     def __call__(self, sentence):
         x = sentence
-        x = self.lower(x)
+        # x = self.lower(x)
         x = self.replace(x)
         x = self.remove_website(x)
         x = self.remove_name_tag(x)

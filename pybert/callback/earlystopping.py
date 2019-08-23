@@ -1,9 +1,32 @@
-#encoding:utf-8
 import numpy as np
-
+from ..common.tools import logger
 class EarlyStopping(object):
     '''
-    early stopping 功能
+        """Stop training when a monitored quantity has stopped improving.
+    # Arguments
+        monitor: quantity to be monitored.
+        min_delta: minimum change in the monitored quantity
+            to qualify as an improvement, i.e. an absolute
+            change of less than min_delta, will count as no
+            improvement.
+        patience: number of epochs with no improvement
+            after which training will be stopped.
+        verbose: verbosity mode.
+        mode: one of {auto, min, max}. In `min` mode,
+            training will stop when the quantity
+            monitored has stopped decreasing; in `max`
+            mode it will stop when the quantity
+            monitored has stopped increasing; in `auto`
+            mode, the direction is automatically inferred
+            from the name of the monitored quantity.
+        baseline: Baseline value for the monitored quantity to reach.
+            Training will stop if the model doesn't show improvement
+            over the baseline.
+        restore_best_weights: whether to restore model weights from
+            the epoch with the best value of the monitored quantity.
+            If False, the model weights obtained at the last step of
+            training are used.
+
     # Arguments
         min_delta: 最小变化
         patience: 多少个epoch未提高，就停止训练
@@ -18,7 +41,6 @@ class EarlyStopping(object):
                  verbose   = 1,
                  mode      = 'min',
                  monitor   = 'loss',
-                 logger    = None,
                  baseline  = None):
 
         self.baseline = baseline
@@ -26,7 +48,6 @@ class EarlyStopping(object):
         self.verbose = verbose
         self.min_delta = min_delta
         self.monitor = monitor
-        self.logger = logger
 
         assert mode in ['min','max']
 
@@ -57,5 +78,5 @@ class EarlyStopping(object):
             self.wait += 1
             if self.wait >= self.patience:
                 if self.verbose >0:
-                    self.logger.info(f"{self.patience} epochs with no improvement after which training will be stopped")
+                    logger.info(f"{self.patience} epochs with no improvement after which training will be stopped")
                 self.stop_training = True

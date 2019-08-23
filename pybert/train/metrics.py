@@ -1,8 +1,7 @@
-#encoding:utf-8
+r"""Functional interface"""
 import torch
 from tqdm import tqdm
 import numpy as np
-from collections import Counter
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import f1_score, classification_report
 
@@ -28,7 +27,7 @@ class Accuracy(Metric):
     '''
     计算准确度
     可以使用topK参数设定计算K准确度
-    Example:
+    Examples:
         >>> metric = Accuracy(**)
         >>> for epoch in range(epochs):
         >>>     metric.reset()
@@ -237,12 +236,8 @@ class F1Score(Metric):
         '''
          计算指标得分
          '''
-        if self.task_type == 'binary':
-            f1 = f1_score(y_true=self.y_true, y_pred=self.y_pred, average=self.average)
-            return f1
-        if self.task_type == 'multiclass':
-            f1 = f1_score(y_true=self.y_true, y_pred=self.y_pred, average=self.average)
-            return f1
+        f1 = f1_score(y_true=self.y_true, y_pred=self.y_pred, average=self.average)
+        return f1
 
     def name(self):
         return 'f1'
@@ -263,7 +258,9 @@ class ClassReport(Metric):
         '''
         计算指标得分
         '''
-        score = classification_report(y_true = self.y_true, y_pred = self.y_pred, target_names=self.target_names)
+        score = classification_report(y_true = self.y_true,
+                                      y_pred = self.y_pred,
+                                      target_names=self.target_names)
         print(f"\n\n classification report: {score}")
 
     def __call__(self,logits,target):

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/Bert-Multi-Label-Text-Classification.iml" filepath="$PROJECT_DIR$/.idea/Bert-Multi-Label-Text-Classification.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pytorch-transformers-master/.idea/pytorch-transformers-master.iml" filepath="$PROJECT_DIR$/../pytorch-transformers-master/.idea/pytorch-transformers-master.iml" />
+    </modules>
+  </component>
+</project>

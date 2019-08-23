@@ -1,9 +1,8 @@
-# Bert multi-label text classification by PyTorch
+## Bert multi-label text classification by PyTorch
 
-This repo contains a PyTorch implementation of a pretrained BERT model  for multi-label text classification.
+This repo contains a PyTorch implementation of the pretrained BERT and XLNET model for multi-label text classification.
 
-**note**: for the new `pytorch-pretrained-bert` package . use comd `from pytorch_pretrained_bert.modeling import BertPreTrainedModel`
-## Structure of the code
+###  Structure of the code
 
 At the root of the project, you will see:
 
@@ -27,12 +26,11 @@ At the root of the project, you will see:
 |  └── train #used for training a model
 |  |  └── trainer.py 
 |  |  └── ...
-|  └── utils # a set of utility functions
-├── convert_tf_checkpoint_to_pytorch.py
-├── train_bert_multi_label.py
-├── inference.py
+|  └── common # a set of utility functions
+├── run_bert.py
+├── run_xlnet.py
 ```
-## Dependencies
+### Dependencies
 
 - csv
 - tqdm
@@ -42,21 +40,26 @@ At the root of the project, you will see:
 - PyTorch 1.0
 - matplotlib
 - pandas
-- pytorch_pretrained_bert (load bert model)
+- pytorch_transformers=1.1.0
 
-## How to use the code
+### How to use the code
 
-you need download pretrained bert model (`uncased_L-12_H-768_A-12`)
+you need download pretrained bert model and xlnet model.
 
-1. Download the Bert pretrained model from [Google](https://storage.googleapis.com/bert_models/2018_10_18/uncased_L-12_H-768_A-12.zip) and place it into the `/pybert/model/pretrain` directory.
-2. `pip install pytorch-pretrained-bert` from [github](https://github.com/huggingface/pytorch-pretrained-BERT).
-3. Run `python convert_tf_checkpoint_to_pytorch.py` to transfer the pretrained model(tensorflow version)  into pytorch form .
+<div class="note info"><p> BERT:  bert-base-uncased</p></div>
+<div class="note info"><p> XLNET:  xlnet-base-cased</p></div>
+
+1. Download the Bert pretrained model from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-pytorch_model.bin) 
+2. Download the Bert config file from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-config.json) 
+3. Download the Bert vocab file from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-vocab.txt) 
+4. modify `bert-base-uncased-pytorch_model.bin` to `pytorch_model.bin` , `bert-base-uncased-config.json` to `config.json` ,`bert-base-uncased-vocab.txt` to `vocab.txt`
+5. place `model` ,`config` and `vocab` file into  the `/pybert/pretrain/bert/base-uncased` directory.
+2. `pip install pytorch-transformers` from [github](https://github.com/huggingface/pytorch-transformers).
 4. Prepare [kaggle data](https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/data), you can modify the `io.data_transformer.py` to adapt your data.
-5. Modify configuration information in `pybert/config/basic_config.py`(the path of data,...).
-6. Run `python train_bert_multi_label.py` to fine tuning bert model.
-7. Run `python inference.py` to predict new data.
-
-## Fine-tuning result
+5. Modify configuration information in `pybert/configs/basic_config.py`(the path of data,...).
+6. Run `python run_bert.py --do_data` to preprocess data.
+7. 6. Run `python run_bert.py --do_train --save_best --do_lower_case` to fine tuning bert model.
+7. Run `run_bert.py --do_test --do_lower_case` to predict new data.
 
 ### training 
 
@@ -66,7 +69,6 @@ training result:
 [2019-01-14 04:01:05]: bert-multi-label trainer.py[line:176] INFO  
 Epoch: 2 - loss: 0.0338 - val_loss: 0.0373 - val_auc: 0.9922
 ```
-
 ### training figure
 
 ![]( https://lonepatient-1257945978.cos.ap-chengdu.myqcloud.com/20190214210111.png)

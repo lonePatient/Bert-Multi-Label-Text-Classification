@@ -17,5 +17,7 @@ class BCEWithLogLoss(object):
         self.loss_fn = BCEWithLogitsLoss()
 
     def __call__(self,output,target):
+        output = output.float()
+        target = target.float()
         loss = self.loss_fn(input = output,target = target)
         return loss
