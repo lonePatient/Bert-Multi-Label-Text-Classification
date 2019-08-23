@@ -209,7 +209,7 @@ def main():
         targets, sentences = data.read_data(raw_data_path=config['raw_data_path'],
                                             preprocessor=EnglishPreProcessor(),
                                             is_train=True)
-        data.train_val_split(X=sentences[:2000], y=targets[:2000], shuffle=True, stratify=False,
+        data.train_val_split(X=sentences, y=targets, shuffle=True, stratify=False,
                              valid_size=args.valid_size, data_dir=config['data_dir'],
                              data_name=args.data_name)
     if args.do_train:
