@@ -62,7 +62,7 @@ you need download pretrained bert model and xlnet model.
 5. Place `model` ,`config` and `vocab` file into  the `/pybert/pretrain/bert/base-uncased` directory.
 6. `pip install pytorch-transformers` from [github](https://github.com/huggingface/pytorch-transformers).
 7. Download [kaggle data](https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/data) and place in `pybert/dataset`.
-    -  you can modify the `io.tast_data.py` to adapt your data.
+    -  you can modify the `io.task_data.py` to adapt your data.
 8. Modify configuration information in `pybert/configs/basic_config.py`(the path of data,...).
 9. Run `python run_bert.py --do_data` to preprocess data.
 10. Run `python run_bert.py --do_train --save_best --do_lower_case` to fine tuning bert model.
