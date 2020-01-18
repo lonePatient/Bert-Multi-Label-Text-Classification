@@ -59,6 +59,7 @@ class Trainer(object):
             if self.model_checkpoint:
                 self.model_checkpoint.best = best
             self.logger.info(f"\nCheckpoint '{resume_path}' and epoch {self.start_epoch} loaded")
+        self.model, self.device = model_device(n_gpu = self.n_gpu, model=self.model)
 
     def epoch_reset(self):
         self.outputs = []
