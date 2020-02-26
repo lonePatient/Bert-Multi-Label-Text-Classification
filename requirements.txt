@@ -12,7 +12,7 @@ kiwisolver==1.1.0
 matplotlib==3.1.1
 numpy==1.17.2
 pandas==0.25.1
-Pillow==6.1.0
+Pillow==6.2.0
 pyparsing==2.4.2
 python-dateutil==2.8.0
 transformers==2.5.1
