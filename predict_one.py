@@ -25,3 +25,8 @@ if __name__ == "__main__":
     arch = 'bert'
     probs = main(text,arch,max_seq_length,do_loer_case)
     print(probs)
+    
+  '''
+  #output
+  [0.98304486 0.40958735 0.9851305  0.04566246 0.8630512  0.07316463]
+  '''
