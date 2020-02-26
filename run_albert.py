@@ -186,7 +186,7 @@ def main():
     parser.add_argument('--fp16_opt_level', type=str, default='O1')
     args = parser.parse_args()
 
-    init_logger(log_file=config['log_dir'] / f'{args.arch}-{time.strftime("%Y-%m-%d-H:%M:%S", time.localtime())}.log')
+    init_logger(log_file=config['log_dir'] / f'{args.arch}-{time.strftime("%Y-%m-%d-%H:%M:%S", time.localtime())}.log')
     config['checkpoint_dir'] = config['checkpoint_dir'] / args.arch
     config['checkpoint_dir'].mkdir(exist_ok=True)
     # Good practice: save your training arguments together with the trained model
