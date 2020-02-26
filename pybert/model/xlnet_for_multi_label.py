@@ -1,5 +1,5 @@
 import torch.nn as nn
-from pytorch_transformers.modeling_xlnet import XLNetPreTrainedModel, XLNetModel,SequenceSummary
+from transformers.modeling_xlnet import XLNetPreTrainedModel, XLNetModel,SequenceSummary
 
 class XlnetForMultiLable(XLNetPreTrainedModel):
     def __init__(self, config):
@@ -8,7 +8,7 @@ class XlnetForMultiLable(XLNetPreTrainedModel):
         self.transformer = XLNetModel(config)
         self.sequence_summary = SequenceSummary(config)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
+        self.init_weights()
 
     def forward(self, input_ids, token_type_ids=None, input_mask=None,attention_mask=None,
                 mems=None, perm_mask=None, target_mapping=None,head_mask=None):

@@ -6,8 +6,8 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
-torch = "==1.0.1"
-pytorch-transformers = "==1.1.0"
+torch = "==1.1.0"
+transformers = "==2.5.1"
 tqdm = "*"
 numpy = "*"
 scikit-learn = "*"

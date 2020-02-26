@@ -1,6 +1,6 @@
-#encoding:utf-8
 from torch.nn import CrossEntropyLoss
 from torch.nn import BCEWithLogitsLoss
+
 
 __call__ = ['CrossEntropy','BCEWithLogLoss']
 
@@ -21,3 +21,5 @@ class BCEWithLogLoss(object):
         target = target.float()
         loss = self.loss_fn(input = output,target = target)
         return loss
+
+

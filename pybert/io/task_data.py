@@ -10,7 +10,7 @@ class TaskData(object):
         pass
     def train_val_split(self,X, y,valid_size,stratify=False,shuffle=True,save = True,
                         seed = None,data_name = None,data_dir = None):
-        pbar = ProgressBar(n_total=len(X))
+        pbar = ProgressBar(n_total=len(X),desc='bucket')
         logger.info('split raw data into train and valid')
         if stratify:
             num_classes = len(list(set(y)))
@@ -18,7 +18,7 @@ class TaskData(object):
             bucket = [[] for _ in range(num_classes)]
             for step,(data_x, data_y) in enumerate(zip(X, y)):
                 bucket[int(data_y)].append((data_x, data_y))
-                pbar.batch_step(step=step,info = {},bar_type='bucket')
+                pbar(step=step)
             del X, y
             for bt in tqdm(bucket, desc='split'):
                 N = len(bt)
@@ -37,7 +37,7 @@ class TaskData(object):
             data = []
             for step,(data_x, data_y) in enumerate(zip(X, y)):
                 data.append((data_x, data_y))
-                pbar.batch_step(step=step, info={}, bar_type='merge')
+                pbar(step=step)
             del X, y
             N = len(data)
             test_size = int(N * valid_size)

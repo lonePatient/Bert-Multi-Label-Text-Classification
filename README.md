@@ -37,12 +37,10 @@ At the root of the project, you will see:
 - numpy
 - pickle
 - scikit-learn
-- PyTorch 1.0
+- PyTorch 1.1+
 - matplotlib
 - pandas
-- pytorch_transformers=1.0.0
-
-**note**: pytorch_transformers>=1.2.0, modify `self.apply(self.init_weights)` to `self.init_weights()` in `pybert/model/nn/bert_for_multi_label.py file` .
+- transformers=2.5.1
 
 ### How to use the code
 
@@ -50,7 +48,6 @@ you need download pretrained bert model and xlnet model.
 
 <div class="note info"><p> BERT:  bert-base-uncased</p></div>
 <div class="note info"><p> XLNET:  xlnet-base-cased</p></div>
-
 1. Download the Bert pretrained model from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-pytorch_model.bin) 
 2. Download the Bert config file from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-config.json) 
 3. Download the Bert vocab file from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-vocab.txt) 

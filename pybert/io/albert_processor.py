@@ -1,11 +1,10 @@
-import csv
 import torch
 import numpy as np
 from ..common.tools import load_pickle
 from ..common.tools import logger
 from ..callback.progressbar import ProgressBar
 from torch.utils.data import TensorDataset
-from transformers import XLNetTokenizer
+from pybert.model.albert.tokenization_albert import FullTokenizer
 
 class InputExample(object):
     def __init__(self, guid, text_a, text_b=None, label=None):
@@ -35,11 +34,11 @@ class InputFeature(object):
         self.label_id    = label_id
         self.input_len = input_len
 
-class XlnetProcessor(object):
+class AlbertProcessor(object):
     """Base class for data converters for sequence classification data sets."""
 
-    def __init__(self,vocab_path,do_lower_case):
-        self.tokenizer = XLNetTokenizer(vocab_path,do_lower_case)
+    def __init__(self,vocab_file,spm_model_file,do_lower_case):
+        self.tokenizer = FullTokenizer(vocab_file=vocab_file,spm_model_file=spm_model_file,do_lower_case=do_lower_case)
 
     def get_train(self, data_file):
         """Gets a collection of `InputExample`s for the train set."""
@@ -83,7 +82,7 @@ class XlnetProcessor(object):
         '''
         Creates examples for data
         '''
-        pbar = ProgressBar(n_total=len(lines),desc='create examples')
+        pbar = ProgressBar(n_total = len(lines),desc='create examples')
         if cached_examples_file.exists():
             logger.info("Loading examples from cached file %s", cached_examples_file)
             examples = torch.load(cached_examples_file)
@@ -100,7 +99,7 @@ class XlnetProcessor(object):
                 text_b = None
                 example = InputExample(guid = guid,text_a = text_a,text_b=text_b,label= label)
                 examples.append(example)
-                pbar(step = i)
+                pbar(step=i)
             logger.info("Saving examples into cached file %s", cached_examples_file)
             torch.save(examples, cached_examples_file)
         return examples
@@ -115,19 +114,12 @@ class XlnetProcessor(object):
         #  tokens:   [CLS] the dog is hairy . [SEP]
         #  type_ids:   0   0   0   0  0     0   0
         '''
-        # Load data features from cache or dataset file
         pbar = ProgressBar(n_total=len(examples),desc='create features')
         if cached_features_file.exists():
             logger.info("Loading features from cached file %s", cached_features_file)
             features = torch.load(cached_features_file)
         else:
             features = []
-            pad_token = self.tokenizer.convert_tokens_to_ids([self.tokenizer.pad_token])[0]
-            cls_token = self.tokenizer.cls_token
-            sep_token = self.tokenizer.sep_token
-            cls_token_segment_id = 2
-            pad_token_segment_id = 4
-
             for ex_id,example in enumerate(examples):
                 tokens_a = self.tokenizer.tokenize(example.text_a)
                 tokens_b = None
@@ -143,25 +135,20 @@ class XlnetProcessor(object):
                     # Account for [CLS] and [SEP] with '-2'
                     if len(tokens_a) > max_seq_len - 2:
                         tokens_a = tokens_a[:max_seq_len - 2]
-
-                # xlnet has a cls token at the end
-                tokens = tokens_a + [sep_token]
+                tokens = ['[CLS]'] + tokens_a + ['[SEP]']
                 segment_ids = [0] * len(tokens)
                 if tokens_b:
-                    tokens += tokens_b + [sep_token]
+                    tokens += tokens_b + ['[SEP]']
                     segment_ids += [1] * (len(tokens_b) + 1)
-                tokens += [cls_token]
-                segment_ids += [cls_token_segment_id]
 
                 input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
                 input_mask = [1] * len(input_ids)
+                padding = [0] * (max_seq_len - len(input_ids))
                 input_len = len(input_ids)
-                padding_len = max_seq_len - len(input_ids)
 
-                # pad on the left for xlnet
-                input_ids = ([pad_token] * padding_len) + input_ids
-                input_mask = ([0 ] * padding_len) + input_mask
-                segment_ids = ([pad_token_segment_id] * padding_len) + segment_ids
+                input_ids   += padding
+                input_mask  += padding
+                segment_ids += padding
 
                 assert len(input_ids) == max_seq_len
                 assert len(input_mask) == max_seq_len

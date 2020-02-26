@@ -5,7 +5,7 @@ from ..common.tools import load_pickle
 from ..common.tools import logger
 from ..callback.progressbar import ProgressBar
 from torch.utils.data import TensorDataset
-from pytorch_transformers import BertTokenizer
+from transformers import BertTokenizer
 
 class InputExample(object):
     def __init__(self, guid, text_a, text_b=None, label=None):
@@ -83,7 +83,7 @@ class BertProcessor(object):
         '''
         Creates examples for data
         '''
-        pbar = ProgressBar(n_total = len(lines))
+        pbar = ProgressBar(n_total = len(lines),desc='create examples')
         if cached_examples_file.exists():
             logger.info("Loading examples from cached file %s", cached_examples_file)
             examples = torch.load(cached_examples_file)
@@ -100,7 +100,7 @@ class BertProcessor(object):
                 text_b = None
                 example = InputExample(guid = guid,text_a = text_a,text_b=text_b,label= label)
                 examples.append(example)
-                pbar.batch_step(step=i,info={},bar_type='create examples')
+                pbar(step=i)
             logger.info("Saving examples into cached file %s", cached_examples_file)
             torch.save(examples, cached_examples_file)
         return examples
@@ -115,7 +115,7 @@ class BertProcessor(object):
         #  tokens:   [CLS] the dog is hairy . [SEP]
         #  type_ids:   0   0   0   0  0     0   0
         '''
-        pbar = ProgressBar(n_total=len(examples))
+        pbar = ProgressBar(n_total=len(examples),desc='create features')
         if cached_features_file.exists():
             logger.info("Loading features from cached file %s", cached_features_file)
             features = torch.load(cached_features_file)
@@ -169,7 +169,7 @@ class BertProcessor(object):
                                        label_id = label_id,
                                        input_len = input_len)
                 features.append(feature)
-                pbar.batch_step(step=ex_id, info={}, bar_type='create features')
+                pbar(step=ex_id)
             logger.info("Saving features into cached file %s", cached_features_file)
             torch.save(features, cached_features_file)
         return features
@@ -183,6 +183,7 @@ class BertProcessor(object):
         all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
         all_label_ids = torch.tensor([f.label_id for f in features],dtype=torch.long)
-        dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+        all_input_lens = torch.tensor([f.input_len for f in features], dtype=torch.long)
+        dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids,all_input_lens)
         return dataset
 

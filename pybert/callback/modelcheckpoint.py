@@ -90,7 +90,6 @@ class ModelCheckpoint(object):
                 state.pop("model")
                 torch.save(state,self.base_path / 'checkpoint_info.bin')
 
-
         else:
             if state['epoch'] % self.epoch_freq == 0:
                 save_path = self.base_path / f"checkpoint-epoch-{state['epoch']}"

@@ -1,64 +1,43 @@
-
 import torch
 from ..callback.progressbar import ProgressBar
-from ..common.tools import restore_checkpoint,model_device
+from ..common.tools import model_device
 from ..common.tools import summary
 from ..common.tools import seed_everything
 from ..common.tools import AverageMeter
 from torch.nn.utils import clip_grad_norm_
 
 class Trainer(object):
-    def __init__(self,n_gpu,
-                 model,
-                 epochs,
-                 logger,
-                 criterion,
-                 optimizer,
-                 lr_scheduler,
-                 early_stopping,
-                 epoch_metrics,
-                 batch_metrics,
-                 gradient_accumulation_steps,
-                 grad_clip = 0.0,
-                 verbose = 1,
-                 fp16 = None,
-                 resume_path = None,
-                 training_monitor = None,
-                 model_checkpoint = None
+    def __init__(self,args,model,logger,criterion,optimizer,scheduler,early_stopping,epoch_metrics,
+                 batch_metrics,verbose = 1,training_monitor = None,model_checkpoint = None
                  ):
-        self.start_epoch = 1
-        self.global_step = 0
-        self.n_gpu = n_gpu
+        self.args = args
         self.model = model
-        self.epochs = epochs
         self.logger =logger
-        self.fp16 = fp16
-        self.grad_clip = grad_clip
         self.verbose = verbose
         self.criterion = criterion
         self.optimizer = optimizer
-        self.lr_scheduler = lr_scheduler
+        self.scheduler = scheduler
         self.early_stopping = early_stopping
         self.epoch_metrics = epoch_metrics
         self.batch_metrics = batch_metrics
         self.model_checkpoint = model_checkpoint
         self.training_monitor = training_monitor
-        self.gradient_accumulation_steps = gradient_accumulation_steps
-        self.model, self.device = model_device(n_gpu = self.n_gpu, model=self.model)
-        if self.fp16:
+        self.start_epoch = 1
+        self.global_step = 0
+        self.model, self.device = model_device(n_gpu = args.n_gpu, model=self.model)
+        if args.fp16:
             try:
                 from apex import amp
             except ImportError:
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
-
-        if resume_path:
-            self.logger.info(f"\nLoading checkpoint: {resume_path}")
-            resume_dict = torch.load(resume_path / 'checkpoint_info.bin')
+        if args.resume_path:
+            self.logger.info(f"\nLoading checkpoint: {args.resume_path}")
+            resume_dict = torch.load(args.resume_path / 'checkpoint_info.bin')
             best = resume_dict['epoch']
             self.start_epoch = resume_dict['epoch']
             if self.model_checkpoint:
                 self.model_checkpoint.best = best
-            self.logger.info(f"\nCheckpoint '{resume_path}' and epoch {self.start_epoch} loaded")
+            self.logger.info(f"\nCheckpoint '{args.resume_path}' and epoch {self.start_epoch} loaded")
 
     def epoch_reset(self):
         self.outputs = []
@@ -80,34 +59,34 @@ class Trainer(object):
         return state
 
     def valid_epoch(self,data):
-        pbar = ProgressBar(n_total=len(data))
+        pbar = ProgressBar(n_total=len(data),desc="Evaluating")
         self.epoch_reset()
-        self.model.eval()
-        with torch.no_grad():
-            for step, batch in enumerate(data):
-                batch = tuple(t.to(self.device) for t in batch)
+        for step, batch in enumerate(data):
+            self.model.eval()
+            batch = tuple(t.to(self.device) for t in batch)
+            with torch.no_grad():
                 input_ids, input_mask, segment_ids, label_ids = batch
                 logits = self.model(input_ids, segment_ids,input_mask)
-                self.outputs.append(logits.cpu().detach())
-                self.targets.append(label_ids.cpu().detach())
-                pbar.batch_step(step=step,info = {},bar_type='Evaluating')
-            self.outputs = torch.cat(self.outputs, dim = 0).cpu().detach()
-            self.targets = torch.cat(self.targets, dim = 0).cpu().detach()
-            loss = self.criterion(target = self.targets, output=self.outputs)
-            self.result['valid_loss'] = loss.item()
-            print("------------- valid result --------------")
-            if self.epoch_metrics:
-                for metric in self.epoch_metrics:
-                    metric(logits=self.outputs, target=self.targets)
-                    value = metric.value()
-                    if value:
-                        self.result[f'valid_{metric.name()}'] = value
-            if 'cuda' in str(self.device):
-                torch.cuda.empty_cache()
-            return self.result
+            self.outputs.append(logits.cpu().detach())
+            self.targets.append(label_ids.cpu().detach())
+            pbar(step=step)
+        self.outputs = torch.cat(self.outputs, dim = 0).cpu().detach()
+        self.targets = torch.cat(self.targets, dim = 0).cpu().detach()
+        loss = self.criterion(target = self.targets, output=self.outputs)
+        self.result['valid_loss'] = loss.item()
+        print("------------- valid result --------------")
+        if self.epoch_metrics:
+            for metric in self.epoch_metrics:
+                metric(logits=self.outputs, target=self.targets)
+                value = metric.value()
+                if value:
+                    self.result[f'valid_{metric.name()}'] = value
+        if 'cuda' in str(self.device):
+            torch.cuda.empty_cache()
+        return self.result
 
     def train_epoch(self,data):
-        pbar = ProgressBar(n_total = len(data))
+        pbar = ProgressBar(n_total = len(data),desc='Training')
         tr_loss = AverageMeter()
         self.epoch_reset()
         for step,  batch in enumerate(data):
@@ -117,19 +96,19 @@ class Trainer(object):
             input_ids, input_mask, segment_ids, label_ids = batch
             logits = self.model(input_ids, segment_ids,input_mask)
             loss = self.criterion(output=logits,target=label_ids)
-            if len(self.n_gpu) >= 2:
+            if len(self.args.n_gpu) >= 2:
                 loss = loss.mean()
-            if self.gradient_accumulation_steps > 1:
-                loss = loss / self.gradient_accumulation_steps
-            if self.fp16:
+            if self.args.gradient_accumulation_steps > 1:
+                loss = loss / self.args.gradient_accumulation_steps
+            if self.args.fp16:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                     scaled_loss.backward()
-                clip_grad_norm_(amp.master_params(self.optimizer), self.grad_clip)
+                clip_grad_norm_(amp.master_params(self.optimizer), self.args.grad_clip)
             else:
                 loss.backward()
-                clip_grad_norm_(self.model.parameters(), self.grad_clip)
-            if (step + 1) % self.gradient_accumulation_steps == 0:
-                self.lr_scheduler.step()
+                clip_grad_norm_(self.model.parameters(), self.args.grad_clip)
+            if (step + 1) % self.args.gradient_accumulation_steps == 0:
+                self.scheduler.step()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.global_step += 1
@@ -140,7 +119,7 @@ class Trainer(object):
             self.info['loss'] = loss.item()
             tr_loss.update(loss.item(),n = 1)
             if self.verbose >= 1:
-                pbar.batch_step(step= step,info = self.info,bar_type='Training')
+                pbar(step= step,info = self.info)
             self.outputs.append(logits.cpu().detach())
             self.targets.append(label_ids.cpu().detach())
         print("\n------------- train result --------------")
@@ -158,8 +137,7 @@ class Trainer(object):
             torch.cuda.empty_cache()
         return self.result
 
-    def train(self,train_data,valid_data,seed):
-        seed_everything(seed)
+    def train(self,train_data,valid_data):
         print("model summary info: ")
         for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(train_data):
             input_ids = input_ids.to(self.device)
@@ -167,10 +145,11 @@ class Trainer(object):
             segment_ids = segment_ids.to(self.device)
             summary(self.model,*(input_ids, segment_ids,input_mask),show_input=True)
             break
-
         # ***************************************************************
-        for epoch in range(self.start_epoch,self.start_epoch+self.epochs):
-            self.logger.info(f"Epoch {epoch}/{self.epochs}")
+        self.model.zero_grad()
+        seed_everything(self.args.seed)  # Added here for reproductibility (even between python 2 a
+        for epoch in range(self.start_epoch,self.start_epoch+self.args.epochs):
+            self.logger.info(f"Epoch {epoch}/{self.args.epochs}")
             train_log = self.train_epoch(train_data)
             valid_log = self.valid_epoch(valid_data)
 
@@ -184,7 +163,7 @@ class Trainer(object):
 
             # save model
             if self.model_checkpoint:
-                state = self.save_info(epoch,best=logs['valid_loss'])
+                state = self.save_info(epoch,best=logs[self.model_checkpoint.monitor])
                 self.model_checkpoint.bert_epoch_step(current=logs[self.model_checkpoint.monitor],state = state)
 
             # early_stopping

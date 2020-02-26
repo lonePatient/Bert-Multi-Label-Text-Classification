@@ -1,20 +1,23 @@
 import torch
+import time
 import warnings
 from pathlib import Path
 from argparse import ArgumentParser
 from pybert.train.losses import BCEWithLogLoss
 from pybert.train.trainer import Trainer
 from torch.utils.data import DataLoader
+from pybert.io.utils import collate_fn
 from pybert.io.bert_processor import BertProcessor
 from pybert.common.tools import init_logger, logger
 from pybert.common.tools import seed_everything
 from pybert.configs.basic_config import config
-from pybert.model.nn.bert_for_multi_label import BertForMultiLable
+from pybert.model.bert_for_multi_label import BertForMultiLable
 from pybert.preprocessing.preprocessor import EnglishPreProcessor
 from pybert.callback.modelcheckpoint import ModelCheckpoint
 from pybert.callback.trainingmonitor import TrainingMonitor
 from pybert.train.metrics import AUC, AccuracyThresh, MultiLabelReport
-from pytorch_transformers import AdamW, WarmupLinearSchedule
+from pybert.callback.optimizater.adamw import AdamW
+from pybert.callback.lr_schedulers import get_linear_schedule_with_warmup
 from torch.utils.data import RandomSampler, SequentialSampler
 
 warnings.filterwarnings("ignore")
@@ -43,23 +46,25 @@ def run_train(args):
         train_sampler = SequentialSampler(train_dataset)
     else:
         train_sampler = RandomSampler(train_dataset)
-    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
+    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size,
+                                  collate_fn=collate_fn)
 
     valid_data = processor.get_dev(config['data_dir'] / f"{args.data_name}.valid.pkl")
     valid_examples = processor.create_examples(lines=valid_data,
                                                example_type='valid',
                                                cached_examples_file=config[
-                                                                        'data_dir'] / f"cached_valid_examples_{args.arch}")
+                                                'data_dir'] / f"cached_valid_examples_{args.arch}")
 
     valid_features = processor.create_features(examples=valid_examples,
                                                max_seq_len=args.eval_max_seq_len,
                                                cached_features_file=config[
-                                                                        'data_dir'] / "cached_valid_features_{}_{}".format(
+                                                'data_dir'] / "cached_valid_features_{}_{}".format(
                                                    args.eval_max_seq_len, args.arch
                                                ))
     valid_dataset = processor.create_dataset(valid_features)
     valid_sampler = SequentialSampler(valid_dataset)
-    valid_dataloader = DataLoader(valid_dataset, sampler=valid_sampler, batch_size=args.eval_batch_size)
+    valid_dataloader = DataLoader(valid_dataset, sampler=valid_sampler, batch_size=args.eval_batch_size,
+                                  collate_fn=collate_fn)
 
     # ------- model
     logger.info("initializing model")
@@ -78,15 +83,14 @@ def run_train(args):
     ]
     warmup_steps = int(t_total * args.warmup_proportion)
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
-    lr_scheduler = WarmupLinearSchedule(optimizer, warmup_steps=warmup_steps, t_total=t_total)
-
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps,
+                                                num_training_steps=t_total)
     if args.fp16:
         try:
             from apex import amp
         except ImportError:
             raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
         model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level)
-
     # ---- callbacks
     logger.info("initializing callbacks")
     train_monitor = TrainingMonitor(file_dir=config['figure_dir'], arch=args.arch)
@@ -104,25 +108,13 @@ def run_train(args):
     logger.info("  Gradient Accumulation steps = %d", args.gradient_accumulation_steps)
     logger.info("  Total optimization steps = %d", t_total)
 
-    trainer = Trainer(n_gpu=args.n_gpu,
-                      model=model,
-                      epochs=args.epochs,
-                      logger=logger,
-                      criterion=BCEWithLogLoss(),
-                      optimizer=optimizer,
-                      lr_scheduler=lr_scheduler,
-                      early_stopping=None,
-                      training_monitor=train_monitor,
-                      fp16=args.fp16,
-                      resume_path=args.resume_path,
-                      grad_clip=args.grad_clip,
+    trainer = Trainer(args= args,model=model,logger=logger,criterion=BCEWithLogLoss(),optimizer=optimizer,
+                      scheduler=scheduler,early_stopping=None,training_monitor=train_monitor,
                       model_checkpoint=model_checkpoint,
-                      gradient_accumulation_steps=args.gradient_accumulation_steps,
                       batch_metrics=[AccuracyThresh(thresh=0.5)],
                       epoch_metrics=[AUC(average='micro', task_type='binary'),
                                      MultiLabelReport(id2label=id2label)])
-    trainer.train(train_data=train_dataloader, valid_data=valid_dataloader, seed=args.seed)
-
+    trainer.train(train_data=train_dataloader, valid_data=valid_dataloader)
 
 def run_test(args):
     from pybert.io.task_data import TaskData
@@ -140,16 +132,17 @@ def run_test(args):
     test_examples = processor.create_examples(lines=test_data,
                                               example_type='test',
                                               cached_examples_file=config[
-                                                                       'data_dir'] / f"cached_test_examples_{args.arch}")
+                                            'data_dir'] / f"cached_test_examples_{args.arch}")
     test_features = processor.create_features(examples=test_examples,
                                               max_seq_len=args.eval_max_seq_len,
                                               cached_features_file=config[
-                                                                       'data_dir'] / "cached_test_features_{}_{}".format(
+                                            'data_dir'] / "cached_test_features_{}_{}".format(
                                                   args.eval_max_seq_len, args.arch
                                               ))
     test_dataset = processor.create_dataset(test_features)
     test_sampler = SequentialSampler(test_dataset)
-    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.train_batch_size)
+    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.train_batch_size,
+                                 collate_fn=collate_fn)
     model = BertForMultiLable.from_pretrained(config['checkpoint_dir'], num_labels=len(label_list))
 
     # ----------- predicting
@@ -170,10 +163,12 @@ def main():
     parser.add_argument("--save_best", action='store_true')
     parser.add_argument("--do_lower_case", action='store_true')
     parser.add_argument('--data_name', default='kaggle', type=str)
-    parser.add_argument("--epochs", default=6, type=int)
-    parser.add_argument("--resume_path", default='', type=str)
     parser.add_argument("--mode", default='min', type=str)
     parser.add_argument("--monitor", default='valid_loss', type=str)
+
+    parser.add_argument("--epochs", default=6, type=int)
+    parser.add_argument("--resume_path", default='', type=str)
+    parser.add_argument("--predict_checkpoints", type=int, default=0)
     parser.add_argument("--valid_size", default=0.2, type=float)
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--sorted", default=1, type=int, help='1 : True  0:False ')
@@ -184,7 +179,7 @@ def main():
     parser.add_argument("--train_max_seq_len", default=256, type=int)
     parser.add_argument("--eval_max_seq_len", default=256, type=int)
     parser.add_argument('--loss_scale', type=float, default=0)
-    parser.add_argument("--warmup_proportion", default=0.1, type=int, )
+    parser.add_argument("--warmup_proportion", default=0.1, type=float)
     parser.add_argument("--weight_decay", default=0.01, type=float)
     parser.add_argument("--adam_epsilon", default=1e-8, type=float)
     parser.add_argument("--grad_clip", default=1.0, type=float)
@@ -192,17 +187,15 @@ def main():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--fp16', action='store_true')
     parser.add_argument('--fp16_opt_level', type=str, default='O1')
-
     args = parser.parse_args()
+
+    init_logger(log_file=config['log_dir'] / f'{args.arch}-{time.strftime("%Y-%m-%d-H:%M:%S", time.localtime())}.log')
     config['checkpoint_dir'] = config['checkpoint_dir'] / args.arch
     config['checkpoint_dir'].mkdir(exist_ok=True)
     # Good practice: save your training arguments together with the trained model
     torch.save(args, config['checkpoint_dir'] / 'training_args.bin')
     seed_everything(args.seed)
-    init_logger(log_file=config['log_dir'] / f"{args.arch}.log")
-
     logger.info("Training/evaluation parameters %s", args)
-
     if args.do_data:
         from pybert.io.task_data import TaskData
         data = TaskData()

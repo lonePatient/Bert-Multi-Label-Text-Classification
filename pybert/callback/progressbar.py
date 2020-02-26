@@ -1,17 +1,23 @@
 import time
-
 class ProgressBar(object):
-
-    def __init__(self, n_total,width=30):
+    '''
+    custom progress bar
+    Example:
+        >>> pbar = ProgressBar(n_total=30,desc='training')
+        >>> step = 2
+        >>> pbar(step=step)
+    '''
+    def __init__(self, n_total,width=30,desc = 'Training'):
         self.width = width
         self.n_total = n_total
         self.start_time = time.time()
+        self.desc = desc
 
-    def batch_step(self, step, info, bar_type='Training'):
+    def __call__(self, step, info={}):
         now = time.time()
         current = step + 1
         recv_per = current / self.n_total
-        bar = f'[{bar_type}] {current}/{self.n_total} ['
+        bar = f'[{self.desc}] {current}/{self.n_total} ['
         if recv_per >= 1:
             recv_per = 1
         prog_width = int(self.width * recv_per)
