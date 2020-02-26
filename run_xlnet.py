@@ -1,4 +1,5 @@
 import torch
+import time
 import warnings
 from pathlib import Path
 from argparse import ArgumentParser
@@ -186,14 +187,13 @@ def main():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--fp16', action='store_true')
     parser.add_argument('--fp16_opt_level', type=str, default='O1')
-
     args = parser.parse_args()
+    init_logger(log_file=config['log_dir'] / f'{args.arch}-{time.strftime("%Y-%m-%d-%H:%M:%S", time.localtime())}.log')
     config['checkpoint_dir'] = config['checkpoint_dir'] / args.arch
     config['checkpoint_dir'].mkdir(exist_ok=True)
     # Good practice: save your training arguments together with the trained model
     torch.save(args, config['checkpoint_dir'] / 'training_args.bin')
     seed_everything(args.seed)
-    init_logger(log_file=config['log_dir'] / f"{args.arch}.log")
     logger.info("Training/evaluation parameters %s", args)
     if args.do_data:
         from pybert.io.task_data import TaskData
