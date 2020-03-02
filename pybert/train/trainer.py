@@ -138,13 +138,13 @@ class Trainer(object):
         return self.result
 
     def train(self,train_data,valid_data):
-        print("model summary info: ")
-        for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(train_data):
-            input_ids = input_ids.to(self.device)
-            input_mask = input_mask.to(self.device)
-            segment_ids = segment_ids.to(self.device)
-            summary(self.model,*(input_ids, segment_ids,input_mask),show_input=True)
-            break
+#         print("model summary info: ")
+#         for step, (input_ids, input_mask, segment_ids, label_ids) in enumerate(train_data):
+#             input_ids = input_ids.to(self.device)
+#             input_mask = input_mask.to(self.device)
+#             segment_ids = segment_ids.to(self.device)
+#             summary(self.model,*(input_ids, segment_ids,input_mask),show_input=True)
+#             break
         # ***************************************************************
         self.model.zero_grad()
         seed_everything(self.args.seed)  # Added here for reproductibility (even between python 2 a
