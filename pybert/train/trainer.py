@@ -33,7 +33,7 @@ class Trainer(object):
         if args.resume_path:
             self.logger.info(f"\nLoading checkpoint: {args.resume_path}")
             resume_dict = torch.load(args.resume_path / 'checkpoint_info.bin')
-            best = resume_dict['epoch']
+            best = resume_dict['best']
             self.start_epoch = resume_dict['epoch']
             if self.model_checkpoint:
                 self.model_checkpoint.best = best
