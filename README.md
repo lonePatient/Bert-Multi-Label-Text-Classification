@@ -47,7 +47,9 @@ At the root of the project, you will see:
 you need download pretrained bert model and xlnet model.
 
 <div class="note info"><p> BERT:  bert-base-uncased</p></div>
+
 <div class="note info"><p> XLNET:  xlnet-base-cased</p></div>
+
 1. Download the Bert pretrained model from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-pytorch_model.bin) 
 2. Download the Bert config file from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-config.json) 
 3. Download the Bert vocab file from [s3](https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-vocab.txt) 
