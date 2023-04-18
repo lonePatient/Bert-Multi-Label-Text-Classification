@@ -65,7 +65,7 @@ you need download pretrained bert model and xlnet model.
 8. Modify configuration information in `pybert/configs/basic_config.py`(the path of data,...).
 9. Run `python run_bert.py --do_data` to preprocess data.
 10. Run `python run_bert.py --do_train --save_best --do_lower_case` to fine tuning bert model.
-11. Run `run_bert.py --do_test --do_lower_case` to predict new data.
+11. Run `python run_bert.py --do_test --do_lower_case` to predict new data.
 
 ### training 
 

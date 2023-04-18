@@ -36,7 +36,7 @@ class TrainingMonitor():
         for (k, v) in logs.items():
             l = self.H.get(k, [])
             # np.float32会报错
-            if not isinstance(v, np.float):
+            if not isinstance(v, float):
                 v = round(float(v), 4)
             l.append(v)
             self.H[k] = l

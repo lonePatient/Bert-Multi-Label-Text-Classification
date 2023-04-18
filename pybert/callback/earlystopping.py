@@ -1,5 +1,7 @@
 import numpy as np
 from ..common.tools import logger
+
+
 class EarlyStopping(object):
     '''
         """Stop training when a monitored quantity has stopped improving.
@@ -35,13 +37,14 @@ class EarlyStopping(object):
         monitor: 计算指标
         baseline: 基线
     '''
+
     def __init__(self,
-                 min_delta = 0,
-                 patience  = 10,
-                 verbose   = 1,
-                 mode      = 'min',
-                 monitor   = 'loss',
-                 baseline  = None):
+                 min_delta=0,
+                 patience=10,
+                 verbose=1,
+                 mode='min',
+                 monitor='loss',
+                 baseline=None):
 
         self.baseline = baseline
         self.patience = patience
@@ -49,7 +52,7 @@ class EarlyStopping(object):
         self.min_delta = min_delta
         self.monitor = monitor
 
-        assert mode in ['min','max']
+        assert mode in ['min', 'max']
 
         if mode == 'min':
             self.monitor_op = np.less
@@ -70,13 +73,13 @@ class EarlyStopping(object):
         else:
             self.best = np.Inf if self.monitor_op == np.less else -np.Inf
 
-    def epoch_step(self,current):
+    def epoch_step(self, current):
         if self.monitor_op(current - self.min_delta, self.best):
             self.best = current
             self.wait = 0
         else:
             self.wait += 1
             if self.wait >= self.patience:
-                if self.verbose >0:
+                if self.verbose > 0:
                     logger.info(f"{self.patience} epochs with no improvement after which training will be stopped")
                 self.stop_training = True
